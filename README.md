@@ -215,7 +215,7 @@ source install/setup.bash
 ros2 launch f1tenth_controller two_vehicles.launch.py
 ```
 
-This launches the obstacle map, RViz, both controllers and both lap trackers. Both controllers start disabled. The primary uses `two_vehicles.yaml`, with a 12 m/s speed limit; the secondary uses the same profile with its speed command multiplied by 0.5. Actual speed depends on each vehicle's LiDAR readings and turns.
+This launches the obstacle map, RViz, both controllers and both lap trackers. Both controllers start disabled. The primary uses `two_vehicles.yaml`, with a 12 m/s speed limit; the secondary uses the same profile with its speed command multiplied by 0.5. Actual speed depends on each vehicle's LiDAR readings and turns. The two-vehicle profile uses more conservative steering, visibility and cornering limits, so its actual driving speed is lower than the fast single-vehicle profile.
 
 Open terminals 2 and 3, source the same environment, then start one read-only lap display in each:
 
