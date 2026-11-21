@@ -1,4 +1,4 @@
-# F1TENTH — Follow the Gap in Zandvoort
+# F1TENTH — Zandvoort, Part 2
 
 ## 1. Approach
 
@@ -13,7 +13,7 @@ The vehicle responds to the observed surroundings without following a predefined
 The main project files are organized as follows:
 
 ```text
-F1Tenth-Repository/
+F1Tenth-Repository-Parte2/
 ├── README.md
 ├── scenarios/                       # Scenario definitions and requirements
 ├── scripts/                         # Validation scripts
@@ -72,23 +72,11 @@ Open a terminal and clone the repository:
 
 ```bash
 cd ~
-git clone https://github.com/mmayorga21/f1tenth-zandvoort.git F1Tenth-Repository
-cd ~/F1Tenth-Repository
+git clone https://github.com/mmayorga21/f1tenth-zandvoort-parte2.git F1Tenth-Repository-Parte2
+cd ~/F1Tenth-Repository-Parte2
 ```
 
-Before building, open the simulator configuration:
-
-```bash
-nano src/f1tenth_gym_ros/config/sim.yaml
-```
-
-Set `map_path` to the project's location on your computer. Replace `YOUR_USERNAME` with your Ubuntu username:
-
-```yaml
-map_path: '/home/YOUR_USERNAME/F1Tenth-Repository/src/f1tenth_gym_ros/maps/Zandvoort_map'
-```
-
-Write this path **without the `.png` or `.yaml` extension**.
+The simulator loads the bundled maps from the installed ROS package; no absolute map path is required.
 
 Install the ROS dependencies and build the workspace:
 
@@ -107,7 +95,7 @@ source install/setup.bash
 In **terminal 1**, load the environment:
 
 ```bash
-cd ~/F1Tenth-Repository
+cd ~/F1Tenth-Repository-Parte2
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ```
@@ -134,7 +122,7 @@ https://github.com/user-attachments/assets/1d38aa8d-d977-45f5-8e1f-aa6f435003ab
 Open **terminal 2** for the controller:
 
 ```bash
-cd ~/F1Tenth-Repository
+cd ~/F1Tenth-Repository-Parte2
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ```
@@ -161,7 +149,7 @@ https://github.com/user-attachments/assets/fda90ad6-1573-44f2-9abe-b83f9fd9939c
 Open **terminal 3** for the lap counter and timer:
 
 ```bash
-cd ~/F1Tenth-Repository
+cd ~/F1Tenth-Repository-Parte2
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
@@ -180,7 +168,7 @@ https://github.com/user-attachments/assets/42a19ed6-84ac-4e24-83c3-7dfc1afe9e51
 Open **terminal 4**:
 
 ```bash
-cd ~/F1Tenth-Repository
+cd ~/F1Tenth-Repository-Parte2
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ```
@@ -220,7 +208,7 @@ To close the programs, press `Ctrl+C` in the controller, lap tracker, and simula
 Close the single-vehicle programs before starting this scenario. In terminal 1:
 
 ```bash
-cd ~/F1Tenth-Repository
+cd ~/F1Tenth-Repository-Parte2
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch f1tenth_controller two_vehicles.launch.py
