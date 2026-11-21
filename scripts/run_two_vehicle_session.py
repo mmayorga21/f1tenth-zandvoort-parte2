@@ -76,7 +76,8 @@ def main():
             extra_distance[vehicle] += math.dist(pose[:2], previous[vehicle][:2])
             if stamp-start_ns > round((targets[vehicle]['completed_time_s']+3.)*1e9):
                 waiting_peaks[vehicle] = max(waiting_peaks[vehicle], abs(msg.twist.twist.linear.x))
-                if waiting_peaks[vehicle] > 6.2:
+                c = latest[vehicle+'/controller']['configuration']
+                if waiting_peaks[vehicle] > c['max_speed_mps']*c['completed_speed_scale']+.2:
                     raise ValueError('post_target_speed_limit_exceeded_'+vehicle)
         previous[vehicle] = pose
         poses.setdefault(stamp, {})[vehicle] = pose
@@ -165,18 +166,21 @@ def main():
         config = latest['sim']['configuration']
         if config['completion_policy'] != 'all_vehicles_target_laps' or config['target_laps'] != 10:
             raise ValueError('wrong_completion_policy_or_target')
+        ratio = config['opponent_speed_scale']
+        if not math.isclose(ratio, .66):
+            raise ValueError('wrong_opponent_speed_scale')
         starts = config['starting_poses']
         if not math.isclose(math.dist(starts[0][:2], starts[1][:2]), 5., abs_tol=1e-8):
             raise ValueError('wrong_starting_separation')
         length, width = (config['vehicle_parameters'][k] for k in ('length', 'width'))
-        for v, start, scale in zip(vehicles, starts, (1., .5)):
+        for v, start, scale in zip(vehicles, starts, (1., ratio)):
             c = latest[v+'/laps']['configuration']
             controller = latest[v+'/controller']['configuration']
             if (c['target_laps'] != 10 or not c['stop_counting_at_target']
                     or not math.isclose(c['gate_x'], start[0]) or not math.isclose(c['gate_y'], start[1])
                     or controller['vehicle_id'] != v or controller['speed_scale'] != scale
                     or controller['yield_on_blocked_gap'] is not True
-                    or controller['completed_speed_scale'] != .5
+                    or controller['completed_speed_scale'] != ratio
                     or controller['max_speed_mps'] != 12.):
                 raise ValueError('wrong_vehicle_configuration')
             footprints[v] = MapFootprint(config['map_path'], length, width)

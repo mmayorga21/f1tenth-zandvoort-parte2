@@ -40,12 +40,15 @@ def launch_nodes(context):
     offset = sim['opponent_start_offset_m']
     starts = [[x, y, yaw], following_pose([x, y, yaw], offset)]
     vehicles = (sim['ego_namespace'], sim['opp_namespace'])
-    for vehicle, scale, start in zip(vehicles, (1., .5), starts):
+    ratio = float(sim['opponent_speed_scale'])
+    if not 0 < ratio <= 1:
+        raise ValueError('opponent_speed_scale must be in (0, 1]')
+    for vehicle, scale, start in zip(vehicles, (1., ratio), starts):
         actions.append(Node(
             package='f1tenth_controller', executable='gap_follower',
             name='gap_follower', namespace=vehicle, output='screen',
             parameters=[{**controller, 'vehicle_id': vehicle, 'speed_scale': scale,
-                         'completed_speed_scale': .5,
+                         'completed_speed_scale': ratio,
                          'yield_on_blocked_gap': True}],
             remappings=[('/scan', '/' + vehicle + '/scan'),
                         ('/drive', '/' + vehicle + '/drive'),

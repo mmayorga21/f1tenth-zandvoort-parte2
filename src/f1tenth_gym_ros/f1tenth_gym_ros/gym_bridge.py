@@ -87,6 +87,7 @@ class GymBridge(Node):
         self.declare_parameter('event_log_path', '~/.ros/f1tenth_zandvoort/events.jsonl')
         self.declare_parameter('drive_timeout_s', 0.3)
         self.declare_parameter('opponent_start_offset_m', 0.0)
+        self.declare_parameter('opponent_speed_scale', 0.66)
         self.declare_parameter('target_laps', 10)
         self.declare_parameter('stopping_deceleration_mps2', 6.0)
 
@@ -226,6 +227,7 @@ class GymBridge(Node):
             'num_agents': num_agents,
             'starting_poses': self.start_poses,
             'opponent_start_offset_m': float(self.get_parameter('opponent_start_offset_m').value),
+            'opponent_speed_scale': float(self.get_parameter('opponent_speed_scale').value),
             'completion_policy': 'all_vehicles_target_laps' if self.has_opp else 'target_laps',
             'target_laps': self.target_laps,
             'stopping_deceleration_mps2': self.stopping_deceleration,

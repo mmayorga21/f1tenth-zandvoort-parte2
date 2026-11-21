@@ -36,20 +36,20 @@ obstacles:
   must_leave_traversable_passage: true
   must_affect_lidar_and_collision_detection: true
   fixed_during_attempt: true
-  geometry_source: user_provided_map
+  geometry_source: user_provided_map_with_first_obstacle_shortened
   # Las cajas delimitan los píxeles añadidos; el PNG define la forma exacta.
   objects:
   - id: 1
     geometry: occupied_map_pixels
     pixel_bbox:
-    - 641
-    - 235
+    - 706
+    - 240
     - 729
     - 255
     bbox_size_m:
-    - 4.49592
-    - 1.0218
-    added_occupied_pixels: 1449
+    - 1.17507
+    - 0.7663500000000001
+    added_occupied_pixels: 239
   - id: 2
     geometry: occupied_map_pixels
     pixel_bbox:

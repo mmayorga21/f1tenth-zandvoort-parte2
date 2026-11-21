@@ -24,6 +24,7 @@ bridge:
     kb_teleop: false
     drive_timeout_s: 0.3
     opponent_start_offset_m: 5.0
+    opponent_speed_scale: 0.66
     target_laps: 10
     stopping_deceleration_mps2: 6.0
     event_log_path: ~/.ros/f1tenth_zandvoort/two_vehicle_events.jsonl

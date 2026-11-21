@@ -29,6 +29,7 @@ def main():
     parser.add_argument('--warmup-steps', type=int, default=0)
     parser.add_argument('--output', required=True)
     parser.add_argument('--config', default=str(ROOT/'src/f1tenth_controller/config/two_vehicles.yaml'))
+    parser.add_argument('--map-path', help='Optional map path without extension for isolated trials')
     args = parser.parse_args()
     if args.seed < 0 or args.warmup_steps < 0:
         parser.error('Seed and warmup steps must be nonnegative')
@@ -41,8 +42,11 @@ def main():
                                'yield_on_blocked_gap': True})
     starts = [[sim[k] for k in ('sx', 'sy', 'stheta')]]
     starts.append(following_pose(starts[0], sim['opponent_start_offset_m']))
-    names, scales = ('ego_racecar', 'opp_racecar'), (1., .5)
+    ratio = float(sim['opponent_speed_scale'])
+    names, scales = ('ego_racecar', 'opp_racecar'), (1., ratio)
     map_path = str(ROOT/'src/f1tenth_gym_ros/maps'/sim['map_path'])
+    if args.map_path:
+        map_path = str(Path(args.map_path).resolve())
     env = gym.make('f110_gym:f110-v0', map=map_path, map_ext='.png', num_agents=2, seed=args.seed)
     obs, _, _, _ = env.reset(np.array(starts))
     length, width = (env.unwrapped.params[k] for k in ('length', 'width'))
@@ -65,7 +69,7 @@ def main():
     wall_start = time.monotonic()
     report = {'result': 'running', 'mode': 'direct_dual_gym_not_ros', 'seed': args.seed,
               'warmup_steps': args.warmup_steps, 'parameters': asdict(parameters),
-              'post_target_speed_scale': .5,
+              'post_target_speed_scale': ratio,
               'trial_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'core_sha256': hashlib.sha256((ROOT/'src/f1tenth_controller/f1tenth_controller/gap.py').read_bytes()).hexdigest()}
 
@@ -90,7 +94,7 @@ def main():
                 if d.reason not in ('following_gap', 'waiting_for_gap'):
                     raise ValueError(names[i]+': '+d.reason)
                 yields[i] += int(d.reason == 'waiting_for_gap')
-                speed = d.speed*(.5 if counters[i].snapshot()['target_reached'] else scale)
+                speed = d.speed*(ratio if counters[i].snapshot()['target_reached'] else scale)
                 if source.completion_requested:
                     speed = min(speed, max(0., abs(float(obs['linear_vels_x'][i]))-sim['stopping_deceleration_mps2']*dt))
                 actions.append([d.steering, speed])
