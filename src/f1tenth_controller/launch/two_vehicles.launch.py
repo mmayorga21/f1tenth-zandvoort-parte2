@@ -16,7 +16,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('rviz', default_value='true'),
         DeclareLaunchArgument('params_file', default_value=os.path.join(
-            controller_share, 'config', 'obstacles.yaml')),
+            controller_share, 'config', 'two_vehicles.yaml')),
         OpaqueFunction(function=launch_nodes),
     ])
 
@@ -44,7 +44,9 @@ def launch_nodes(context):
         actions.append(Node(
             package='f1tenth_controller', executable='gap_follower',
             name='gap_follower', namespace=vehicle, output='screen',
-            parameters=[{**controller, 'vehicle_id': vehicle, 'speed_scale': scale}],
+            parameters=[{**controller, 'vehicle_id': vehicle, 'speed_scale': scale,
+                         'completed_speed_scale': .5,
+                         'yield_on_blocked_gap': True}],
             remappings=[('/scan', '/' + vehicle + '/scan'),
                         ('/drive', '/' + vehicle + '/drive'),
                         ('/sim/status', '/' + vehicle + '/sim/status'),

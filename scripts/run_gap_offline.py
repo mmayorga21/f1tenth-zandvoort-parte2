@@ -36,7 +36,7 @@ def main():
     rows=[];stopped=0;wall_start=time.monotonic();reason='timeout'
     for step in range(int(args.max_sim_seconds/dt)):
         decision=core.decide(obs['scans'][0],-sim_config['scan_fov']/2,
-                             sim_config['scan_fov']/sim_config['scan_beams'],0.,30.,dt)
+                             sim_config['scan_fov']/(sim_config['scan_beams']-1),0.,30.,dt)
         obs,_,_,_=env.step(np.array([[decision.steering,decision.speed]]))
         elapsed=(step+1)*dt
         x,y,yaw=[float(obs[k][0]) for k in ('poses_x','poses_y','poses_theta')]

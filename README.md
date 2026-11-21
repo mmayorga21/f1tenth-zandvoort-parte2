@@ -6,7 +6,7 @@ This project uses Follow the Gap, a reactive navigation algorithm that selects t
 
 The controller processes the readings, adds a safety margin around obstacles, and identifies contiguous areas of free space. It selects a target within the chosen gap and steers towards it. Speed is adjusted to the required turn and the available clearance ahead.
 
-The vehicle responds to the observed surroundings without following a predefined driving trajectory. A separate lap tracker uses odometry to count complete circuits and measure lap times. In the two-vehicle integration, each vehicle runs its own Follow the Gap controller and lap tracker. The secondary vehicle starts five metres ahead and applies a factor of 0.5 to its controller's speed command.
+The vehicle responds to the observed surroundings without following a predefined driving trajectory. A separate lap tracker uses odometry to count complete circuits and measure lap times. In the two-vehicle scenario, a valid scan with no safe gap commands braking while the controller continues checking for free space. Invalid front readings, collisions and command loss still interrupt the attempt; a valid nearby obstacle triggers braking and continued checks for free space. In the two-vehicle integration, each vehicle runs its own Follow the Gap controller and lap tracker. The secondary vehicle starts five metres ahead and applies a factor of 0.5 to its controller's speed command.
 
 ## 2. Code structure
 
@@ -23,7 +23,8 @@ F1Tenth-Repository-Parte2/
     │   ├── config/
     │   │   ├── follow_the_gap.yaml   # Original-track controller profile
     │   │   ├── conservative.yaml     # Original-track conservative profile
-    │   │   ├── obstacles.yaml        # Fast obstacle-course profile
+    │   │   ├── obstacles.yaml        # Fast single-vehicle obstacle-course profile
+    │   │   ├── two_vehicles.yaml     # Two-vehicle controller profile
     │   │   ├── obstacles_conservative.yaml # 4 m/s obstacle-course reference
     │   │   └── lap_tracker.yaml      # Lap counter configuration
     │   ├── f1tenth_controller/
@@ -214,7 +215,7 @@ source install/setup.bash
 ros2 launch f1tenth_controller two_vehicles.launch.py
 ```
 
-This launches the obstacle map, RViz, both controllers and both lap trackers. Both controllers start disabled. The primary uses `obstacles.yaml`, with a 12 m/s speed limit; the secondary uses the same profile with its speed command multiplied by 0.5. Actual speed depends on each vehicle's LiDAR readings and turns.
+This launches the obstacle map, RViz, both controllers and both lap trackers. Both controllers start disabled. The primary uses `two_vehicles.yaml`, with a 12 m/s speed limit; the secondary uses the same profile with its speed command multiplied by 0.5. Actual speed depends on each vehicle's LiDAR readings and turns.
 
 Open terminals 2 and 3, source the same environment, then start one read-only lap display in each:
 
@@ -240,7 +241,7 @@ ros2 service call /opp_racecar/controller/enable std_srvs/srv/SetBool "{data: tr
 
 The shared attempt starts only after both controllers are ready. Each counter measures complete circuits from its own starting gate. A collision or loss of commands from either vehicle invalidates the shared attempt and freezes both vehicles.
 
-When one vehicle completes ten laps, it keeps driving while the other finishes. Its counter and lap times retain only its first ten laps. After both complete ten valid laps, both vehicles brake while continuing to steer with Follow the Gap, and the attempt closes automatically. The panels retain the results. Verify the overtake by observing the simulation.
+After completing ten laps, the primary keeps driving at the secondary's nominal speed scale (0.5), reducing further overtakes while waiting. Its counter and lap times retain only its first ten laps. After both complete ten valid laps, both vehicles brake while continuing to steer with Follow the Gap, and the attempt closes automatically. The panels retain the results. Verify the overtake by observing the simulation.
 
 To end an attempt early, request a controlled stop of both vehicles:
 

@@ -85,7 +85,7 @@ def main():
     try:
         for step in range(int((args.laps*400.+10.)/dt)):
             command = controller.decide(obs['scans'][0], -sim['scan_fov']/2,
-                                         sim['scan_fov']/sim['scan_beams'], 0., 30., dt)
+                                         sim['scan_fov']/(sim['scan_beams']-1), 0., 30., dt)
             if command.reason != 'following_gap':
                 failure = command.reason
                 break
