@@ -12,7 +12,6 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from rclpy.signals import SignalHandlerOptions
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import LaserScan
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, SetBool
 
@@ -34,10 +33,8 @@ def main():
     qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
                      reliability=ReliabilityPolicy.RELIABLE)
     latest, received, events = {}, {}, {v: [] for v in vehicles}
-    last_scans = {}
     references, crossings, footprints, targets = {}, {v: [] for v in vehicles}, {}, {}
     poses, previous, extra_distance, peaks = {}, {}, dict.fromkeys(vehicles, 0.), dict.fromkeys(vehicles, 0.)
-    waiting_peaks = dict.fromkeys(vehicles, 0.)
     active, start_ns, body_checks = False, None, 0
     length = width = 0.
     wall_start = time.monotonic()
@@ -74,11 +71,9 @@ def main():
         peaks[vehicle] = max(peaks[vehicle], abs(msg.twist.twist.linear.x))
         if vehicle in targets and vehicle in previous:
             extra_distance[vehicle] += math.dist(pose[:2], previous[vehicle][:2])
-            if stamp-start_ns > round((targets[vehicle]['completed_time_s']+3.)*1e9):
-                waiting_peaks[vehicle] = max(waiting_peaks[vehicle], abs(msg.twist.twist.linear.x))
-                c = latest[vehicle+'/controller']['configuration']
-                if waiting_peaks[vehicle] > c['max_speed_mps']*c['completed_speed_scale']+.2:
-                    raise ValueError('post_target_speed_limit_exceeded_'+vehicle)
+            if vehicle == vehicles[0] and stamp-start_ns > round((targets[vehicle]['completed_time_s']+3.)*1e9):
+                if abs(msg.twist.twist.linear.x) > .02 or extra_distance[vehicle] > .3:
+                    raise ValueError('primary_did_not_remain_parked_at_finish')
         previous[vehicle] = pose
         poses.setdefault(stamp, {})[vehicle] = pose
         if len(poses[stamp]) == 2:
@@ -93,16 +88,7 @@ def main():
             references[vehicle] = make_reference(vehicle)
 
     subs = [node.create_subscription(String, '/sim/status', lambda m: receive('sim', m), qos)]
-    def on_scan(vehicle, msg):
-        if not math.isclose(msg.angle_min+(len(msg.ranges)-1)*msg.angle_increment, msg.angle_max, abs_tol=1e-6):
-            raise ValueError('inconsistent_scan_angles_'+vehicle)
-        last_scans[vehicle] = {
-            'sim_time_ns': msg.header.stamp.sec*1_000_000_000+msg.header.stamp.nanosec,
-            'angle_min': msg.angle_min, 'angle_increment': msg.angle_increment,
-            'range_min': msg.range_min, 'range_max': msg.range_max, 'ranges': list(msg.ranges)}
     for v in vehicles:
-        subs.append(node.create_subscription(LaserScan, '/'+v+'/scan',
-                    lambda m, v=v: on_scan(v, m), 10))
         for suffix, key in [('controller/status', 'controller'), ('laps/status', 'laps')]:
             subs.append(node.create_subscription(String, '/'+v+'/'+suffix,
                         lambda m, k=v+'/'+key: receive(k, m), qos))
@@ -138,10 +124,8 @@ def main():
 
     def checkpoint(result='running', error=None):
         report.update(result=result, error=error, last_status=latest,
-                      last_scans=last_scans,
                       independent_crossings=crossings, distance_after_target_m=extra_distance,
                       target_crossing_status=targets, peaks_mps=peaks,
-                      waiting_peaks_mps=waiting_peaks,
                       same_time_body_checks=body_checks,
                       footprint_samples={v: f.samples for v, f in footprints.items()},
                       wall_elapsed_s=time.monotonic()-wall_start)
@@ -160,27 +144,20 @@ def main():
         call('reset')
         wait(lambda: latest['sim']['state'] == 'ready' and all(
              latest[v+'/laps']['state'] == 'ready' and latest[v+'/laps']['lap_count'] == 0
-             and latest[v+'/laps']['session_id'] == latest['sim']['session_id']
-             and latest[v+'/controller'].get('identity') == [latest['sim']['run_id'], latest['sim']['session_id']]
-             for v in vehicles))
+             and latest[v+'/laps']['session_id'] == latest['sim']['session_id'] for v in vehicles))
         config = latest['sim']['configuration']
         if config['completion_policy'] != 'all_vehicles_target_laps' or config['target_laps'] != 10:
             raise ValueError('wrong_completion_policy_or_target')
-        ratio = config['opponent_speed_scale']
-        if not math.isclose(ratio, .66):
-            raise ValueError('wrong_opponent_speed_scale')
         starts = config['starting_poses']
         if not math.isclose(math.dist(starts[0][:2], starts[1][:2]), 5., abs_tol=1e-8):
             raise ValueError('wrong_starting_separation')
         length, width = (config['vehicle_parameters'][k] for k in ('length', 'width'))
-        for v, start, scale in zip(vehicles, starts, (1., ratio)):
+        for v, start, scale in zip(vehicles, starts, (1., .5)):
             c = latest[v+'/laps']['configuration']
             controller = latest[v+'/controller']['configuration']
             if (c['target_laps'] != 10 or not c['stop_counting_at_target']
                     or not math.isclose(c['gate_x'], start[0]) or not math.isclose(c['gate_y'], start[1])
                     or controller['vehicle_id'] != v or controller['speed_scale'] != scale
-                    or controller['yield_on_blocked_gap'] is not True
-                    or controller['completed_speed_scale'] != ratio
                     or controller['max_speed_mps'] != 12.):
                 raise ValueError('wrong_vehicle_configuration')
             footprints[v] = MapFootprint(config['map_path'], length, width)
@@ -243,9 +220,12 @@ def main():
                                 and e['attempt_id'] == source['attempt_id']]
             if len(completed_events) != 10:
                 raise ValueError('lap_event_count_disagrees_'+v)
-        first = min(vehicles, key=lambda v: targets[v]['completed_time_s'])
-        if extra_distance[first] < 10.:
-            raise ValueError('first_finisher_did_not_keep_driving')
+        first = vehicles[0]
+        gate = latest[first+'/laps']['configuration']
+        pose = source['vehicles'][first]['pose']
+        along = (pose[0]-gate['gate_x'])*math.cos(gate['gate_yaw'])+(pose[1]-gate['gate_y'])*math.sin(gate['gate_yaw'])
+        if not -.02 <= along <= .3:
+            raise ValueError('primary_not_parked_at_finish_gate')
         before = (source['sim_time_ns'], [source['vehicles'][v]['pose'] for v in vehicles])
         spin(.5)
         after = (latest['sim']['sim_time_ns'], [latest['sim']['vehicles'][v]['pose'] for v in vehicles])

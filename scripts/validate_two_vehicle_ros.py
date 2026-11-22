@@ -136,7 +136,7 @@ def main():
         if offset <= 0 or not math.isclose(math.dist(starts[0][:2], starts[1][:2]), offset, abs_tol=1e-8):
             raise ValueError('wrong_starting_separation')
         length, width = (source['configuration']['vehicle_parameters'][k] for k in ('length', 'width'))
-        for v, start, scale in zip(vehicles, starts, (1., source['configuration']['opponent_speed_scale'])):
+        for v, start, scale in zip(vehicles, starts, (1., .5)):
             config = latest[v+'/controller']['configuration']
             if config['vehicle_id'] != v or config['speed_scale'] != scale or config['max_speed_mps'] != 12.:
                 raise ValueError('wrong_controller_binding_or_profile')

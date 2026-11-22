@@ -28,15 +28,11 @@ class GapFollower(Node):
         parameters = GapParameters(**{k: self.get_parameter(k).value for k in defaults})
         self.core = FollowGap(parameters)
         self.declare_parameter('speed_scale', 1.0)
-        self.declare_parameter('completed_speed_scale', 1.0)
         self.declare_parameter('vehicle_id', 'ego_racecar')
         self.speed_scale = float(self.get_parameter('speed_scale').value)
-        self.completed_speed_scale = float(self.get_parameter('completed_speed_scale').value)
         self.vehicle_id = self.get_parameter('vehicle_id').value
         if not math.isfinite(self.speed_scale) or not 0 < self.speed_scale <= 1:
             raise ValueError('speed_scale must be in (0, 1]')
-        if not math.isfinite(self.completed_speed_scale) or not 0 < self.completed_speed_scale <= 1:
-            raise ValueError('completed_speed_scale must be in (0, 1]')
         self.declare_parameter('scan_timeout_s', 0.3)
         self.declare_parameter('status_timeout_s', 0.5)
         self.declare_parameter('max_scan_age_s', 0.15)
@@ -61,8 +57,7 @@ class GapFollower(Node):
         self.configuration.update(scan_timeout_s=self.gate.scan_timeout,
                                   status_timeout_s=self.gate.status_timeout,
                                   max_scan_age_s=self.max_scan_age)
-        self.configuration.update(speed_scale=self.speed_scale, completed_speed_scale=self.completed_speed_scale,
-                                  vehicle_id=self.vehicle_id)
+        self.configuration.update(speed_scale=self.speed_scale, vehicle_id=self.vehicle_id)
         sources = [Path(__file__), Path(__file__).with_name('gap.py'),
                    Path(__file__).with_name('control_gate.py')]
         self.code_sha256 = hashlib.sha256(b''.join(p.read_bytes() for p in sources)).hexdigest()
@@ -139,17 +134,22 @@ class GapFollower(Node):
             return
         dt = 0.01 if self.previous_stamp is None else (stamp-self.previous_stamp)/1e9
         self.previous_stamp = stamp
+        if self.gate.status.get('own_target_reached'):
+            # Keep publishing and remain healthy while the other car finishes.
+            # Do not let a passing car make the parked controller seek a new gap.
+            self.last_decision = Decision(reason='vehicle_finished', steering=self.last_decision.steering)
+            self.publish_command(0., self.last_decision.steering)
+            return
         decision = self.core.decide(scan.ranges, scan.angle_min, scan.angle_increment,
                                     scan.range_min, scan.range_max, min(dt, 0.05))
-        scale = self.completed_speed_scale if self.gate.status.get('own_target_reached') else self.speed_scale
-        self.last_decision = replace(decision, speed=decision.speed * scale)
+        self.last_decision = replace(decision, speed=decision.speed * self.speed_scale)
         if self.gate.status.get('controlled_stopping'):
             limit = self.gate.status['braking_speed_limit_mps']
             if not math.isfinite(limit) or limit < 0:
                 self.stop('invalid_braking_limit')
                 return
             self.last_decision = replace(self.last_decision, speed=min(self.last_decision.speed, limit))
-        if decision.reason not in ('following_gap', 'waiting_for_gap'):
+        if decision.reason != 'following_gap':
             self.stop(decision.reason)
             return
         self.publish_command(self.last_decision.speed, self.last_decision.steering)

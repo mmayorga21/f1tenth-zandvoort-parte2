@@ -44,41 +44,6 @@ class GapTests(unittest.TestCase):
             self.assertGreater(d.steering*sign,0.)
             self.assertLessEqual(abs(d.steering),core.p.max_steering_rate_rad_s*.01+1e-9)
 
-    def test_temporary_blockage_brakes_and_resumes_without_resetting_steering(self):
-        core = FollowGap(GapParameters(yield_on_blocked_gap=True))
-        core.previous_steering, core.previous_target, core.previous_speed = .12, .3, 2.
-        blocked = self.decide(core, np.full(1080, .6))
-        self.assertEqual(blocked.reason, 'waiting_for_gap')
-        self.assertEqual(blocked.speed, 0.)
-        self.assertLessEqual(abs(blocked.steering-.12), core.p.max_steering_rate_rad_s*.01)
-        clear = self.decide(core, np.full(1080, 20.))
-        self.assertEqual(clear.reason, 'following_gap')
-        self.assertGreater(clear.speed, 0.)
-        self.assertLessEqual(clear.speed, core.p.max_acceleration_mps2*.01)
-
-    def test_yielding_does_not_accept_invalid_scans(self):
-        for scan in [np.full(1080, np.nan), np.zeros(1080), np.full(1080, -np.inf)]:
-            core = FollowGap(GapParameters(yield_on_blocked_gap=True))
-            result = self.decide(core, scan)
-            self.assertEqual(result.speed, 0.)
-            self.assertNotIn(result.reason, ('waiting_for_gap', 'following_gap'))
-
-    def test_valid_close_obstacle_brakes_without_becoming_a_sensor_failure(self):
-        core = FollowGap(GapParameters(yield_on_blocked_gap=True))
-        close = self.decide(core, np.full(1080, .3))
-        self.assertEqual(close.reason, 'waiting_for_gap')
-        self.assertEqual(close.speed, 0.)
-        self.assertEqual(self.decide(core, np.full(1080, 20.)).reason, 'following_gap')
-
-    def test_blocked_gap_steering_uses_observed_distance_instead_of_zero_bubble(self):
-        core = FollowGap(GapParameters(yield_on_blocked_gap=True))
-        core.previous_target = .2
-        scan = np.full(1080, .8); scan[540] = .6
-        decision = self.decide(core, scan, dt=.5)
-        self.assertEqual(decision.reason, 'waiting_for_gap')
-        self.assertGreater(decision.target_range, 0.)
-        self.assertLess(abs(decision.steering), .3)
-
     def test_obstacle_filter_preserves_narrow_invalid_obstacle(self):
         a=np.full(1080,6.);a[540]=np.nan
         self.assertEqual(self.decide(FollowGap(),a).speed,0.)

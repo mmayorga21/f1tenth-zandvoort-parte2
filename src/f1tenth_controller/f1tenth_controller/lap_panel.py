@@ -74,7 +74,7 @@ def format_panel(status, width=78, height=26):
     if status['state'] == 'ready' and status.get('awaiting_joint_start'):
         reason = 'Enable both controllers to start together'
     elif status.get('vehicle_id') and status['state'] == 'running' and status['target_reached']:
-        reason = 'Target completed; continuing until both vehicles finish'
+        reason = 'Target completed; waiting for the other vehicle'
     lines += ['', reason]
     if status['pause_used']:
         lines.append('This attempt was paused')

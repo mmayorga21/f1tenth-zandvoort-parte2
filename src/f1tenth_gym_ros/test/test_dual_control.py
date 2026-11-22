@@ -3,7 +3,23 @@ import math
 
 import pytest
 
-from f1tenth_gym_ros.dual_control import DualControlGate, following_pose
+from f1tenth_gym_ros.dual_control import DualControlGate, following_pose, finish_speed_limit
+
+
+def test_finish_braking_only_on_last_lap_after_all_checkpoints():
+    final = {'lap_count': 9, 'checkpoints_passed': 6, 'checkpoint_count': 6}
+    start = [0., 0., 0.]
+    assert math.isinf(finish_speed_limit([-8., 0., 0.], start, {**final, 'lap_count': 8}, 10, 6.))
+    assert math.isinf(finish_speed_limit([-8., 0., 0.], start, {**final, 'checkpoints_passed': 5}, 10, 6.))
+    assert math.isinf(finish_speed_limit([-8., 4., 0.], start, final, 10, 6.))
+    assert 0 < finish_speed_limit([-.1, 0., 0.], start, final, 10, 6.) < finish_speed_limit([-8., 0., 0.], start, final, 10, 6.)
+    assert finish_speed_limit([.1, 0., 0.], start, final, 10, 6.) == 0.
+
+
+def test_completed_vehicle_stays_stopped_and_reset_releases_finish_limit():
+    start = [0., 0., 0.]
+    assert finish_speed_limit([.05, .2, 0.], start, {'target_reached': True}, 10, 6.) == 0.
+    assert math.isinf(finish_speed_limit([.05, .2, 0.], start, {}, 10, 6.))
 
 
 def ready_gate():

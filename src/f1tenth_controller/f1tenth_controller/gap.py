@@ -29,16 +29,13 @@ class GapParameters:
     front_clearance_half_angle_rad: float = 0.14
     lateral_acceleration_limit_mps2: float = 0.0
     braking_deceleration_mps2: float = 0.0
-    yield_on_blocked_gap: bool = False
 
     def validate(self):
         values = asdict(self)
         if not all(math.isfinite(float(v)) for v in values.values()):
             raise ValueError('Parameters must be finite')
         optional = ('heading_weight', 'continuity_weight', 'lateral_acceleration_limit_mps2',
-                    'braking_deceleration_mps2', 'yield_on_blocked_gap')
-        if type(self.yield_on_blocked_gap) is not bool:
-            raise ValueError('yield_on_blocked_gap must be boolean')
+                    'braking_deceleration_mps2')
         if any(v <= 0 for k, v in values.items() if k not in optional):
             raise ValueError('Distances, limits and windows must be positive')
         if self.lateral_acceleration_limit_mps2 < 0 or self.braking_deceleration_mps2 < 0:
@@ -102,13 +99,8 @@ class FollowGap:
         clean = np.minimum(np.nan_to_num(raw, nan=0.0, neginf=0.0, posinf=range_max), min(range_max, p.max_range_m))
         clean[invalid] = 0.0
         front = float(np.min(clean[np.abs(angles) <= p.front_clearance_half_angle_rad]))
-        braking_reason = None
         if front < p.emergency_front_distance_m:
-            front_invalid = np.any(invalid[np.abs(angles) <= p.front_clearance_half_angle_rad])
-            if p.yield_on_blocked_gap and not front_invalid:
-                braking_reason = 'waiting_for_gap'
-            else:
-                return self.stop('front_obstacle_or_invalid_data', front)
+            return self.stop('front_obstacle_or_invalid_data', front)
         # A minimum filter keeps a narrow obstacle instead of averaging it away.
         half = p.filter_window // 2
         padded = np.pad(clean, (half, half), mode='edge')
@@ -144,20 +136,10 @@ class FollowGap:
             if best is None or candidate[0] > best[0]:
                 best = candidate
         if best is None:
-            if p.yield_on_blocked_gap:
-                # A valid scan can be temporarily blocked by another car.
-                # Brake without relinquishing control; reevaluate the next scan.
-                score = (filtered/p.max_range_m-p.heading_weight*np.abs(angles)
-                         -p.continuity_weight*np.abs(angles-self.previous_target))
-                target = int(np.argmax(score))
-                best = (float(score[target]), target, target, target)
-                braking_reason = 'waiting_for_gap'
-            else:
-                return self.stop('no_safe_gap', front)
+            return self.stop('no_safe_gap', front)
         _, target, start, end = best
         target_angle = float(angles[target])
-        target_range = float(filtered[target] if braking_reason and start == end else extended[target])
-        distance = min(p.lookahead_m, target_range)
+        distance = min(p.lookahead_m, float(extended[target]))
         desired = math.atan2(2*p.wheelbase_m*math.sin(target_angle), distance)
         desired = float(np.clip(desired, -p.max_steering_rad, p.max_steering_rad))
         alpha = dt / (p.steering_time_constant_s + dt)
@@ -165,11 +147,9 @@ class FollowGap:
             alpha*(desired-self.previous_steering),
             -p.max_steering_rate_rad_s*dt, p.max_steering_rate_rad_s*dt))
         speed = self.speed_limit(desired, steering, front, dt)
-        if braking_reason:
-            speed = 0.
         self.previous_target, self.previous_steering, self.previous_speed = target_angle, steering, speed
-        return Decision(float(speed), float(steering), braking_reason or 'following_gap', target_angle,
-                        target_range, float(angles[start]), float(angles[end]), front)
+        return Decision(float(speed), float(steering), 'following_gap', target_angle,
+                        float(extended[target]), float(angles[start]), float(angles[end]), front)
 
     def speed_limit(self, desired, steering, front, dt):
         p = self.p

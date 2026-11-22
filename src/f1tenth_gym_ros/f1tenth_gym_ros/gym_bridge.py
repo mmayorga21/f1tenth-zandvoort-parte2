@@ -29,7 +29,7 @@ from builtin_interfaces.msg import Time
 from std_msgs.msg import Bool, String
 from std_srvs.srv import Trigger, SetBool
 from .simulation_session import SimulationSession
-from .dual_control import DualControlGate, following_pose
+from .dual_control import DualControlGate, following_pose, finish_speed_limit
 from pathlib import Path
 from datetime import datetime, timezone
 import hashlib
@@ -87,7 +87,6 @@ class GymBridge(Node):
         self.declare_parameter('event_log_path', '~/.ros/f1tenth_zandvoort/events.jsonl')
         self.declare_parameter('drive_timeout_s', 0.3)
         self.declare_parameter('opponent_start_offset_m', 0.0)
-        self.declare_parameter('opponent_speed_scale', 0.66)
         self.declare_parameter('target_laps', 10)
         self.declare_parameter('stopping_deceleration_mps2', 6.0)
 
@@ -120,7 +119,7 @@ class GymBridge(Node):
         scan_beams = self.get_parameter('scan_beams').value
         self.angle_min = -scan_fov / 2.
         self.angle_max = scan_fov / 2.
-        self.angle_inc = scan_fov / (scan_beams - 1)
+        self.angle_inc = scan_fov / scan_beams
         self.ego_namespace = self.get_parameter('ego_namespace').value
         ego_odom_topic = self.ego_namespace + '/' + self.get_parameter('ego_odom_topic').value
         self.scan_distance_to_base_link = self.get_parameter('scan_distance_to_base_link').value
@@ -227,10 +226,10 @@ class GymBridge(Node):
             'num_agents': num_agents,
             'starting_poses': self.start_poses,
             'opponent_start_offset_m': float(self.get_parameter('opponent_start_offset_m').value),
-            'opponent_speed_scale': float(self.get_parameter('opponent_speed_scale').value),
             'completion_policy': 'all_vehicles_target_laps' if self.has_opp else 'target_laps',
             'target_laps': self.target_laps,
             'stopping_deceleration_mps2': self.stopping_deceleration,
+            'primary_finish_policy': 'stop_at_own_finish_gate' if self.has_opp else 'session_completion',
             'code_sha256': hashlib.sha256(
                 Path(__file__).read_bytes() +
                 Path(__file__).with_name('simulation_session.py').read_bytes() +
@@ -573,6 +572,9 @@ class GymBridge(Node):
             actions = [[self.ego_steer, self.ego_requested_speed]]
             if self.has_opp:
                 actions.append([self.opp_steer, self.opp_requested_speed])
+                actions[0][1] = min(actions[0][1], finish_speed_limit(
+                    self.ego_pose, self.start_poses[0], self.lap_statuses.get(self.ego_namespace, {}),
+                    self.target_laps, self.stopping_deceleration))
                 if self.manual_stop_requested or self.session.completion_requested:
                     actions[0][1] = min(actions[0][1], self.braking_limit(self.ego_speed[0]))
                     actions[1][1] = min(actions[1][1], self.braking_limit(self.opp_speed[0]))

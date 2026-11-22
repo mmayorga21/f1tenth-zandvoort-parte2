@@ -10,6 +10,30 @@ def following_pose(pose, distance):
     return [x + distance * math.cos(yaw), y + distance * math.sin(yaw), yaw]
 
 
+def finish_speed_limit(pose, start, laps, target, deceleration, stop_offset=.1):
+    """Brake on the final straight and hold just beyond the own finish gate.
+
+    Checkpoints prevent a nearby, earlier section of the circuit from triggering
+    finish braking. The small positive offset lets the lap counter observe the
+    crossing before the car comes to rest. Physics and collisions remain active.
+    """
+    if laps.get('target_reached') is True:
+        return 0.
+    if (laps.get('lap_count') != target-1 or not laps.get('checkpoint_count')
+            or laps.get('checkpoints_passed') != laps['checkpoint_count']):
+        return math.inf
+    x, y, yaw = start
+    dx, dy = pose[0]-x, pose[1]-y
+    along = dx*math.cos(yaw)+dy*math.sin(yaw)
+    lateral = -dx*math.sin(yaw)+dy*math.cos(yaw)
+    if not -25. <= along <= stop_offset+1. or abs(lateral) > 1.3:
+        return math.inf
+    distance = max(0., stop_offset-along)
+    # Include velocity-servo response instead of assuming instantaneous braking.
+    response = deceleration*.06
+    return max(0., math.sqrt(response*response+2*deceleration*distance)-response)
+
+
 class DualControlGate:
     def __init__(self, vehicles, drive_timeout=.3, status_timeout=.5):
         self.vehicles = tuple(vehicles)

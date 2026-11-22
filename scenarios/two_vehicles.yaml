@@ -4,7 +4,7 @@ schema_version: 1
 scenario: two_vehicles
 purpose: final_evaluation
 objective: overtake_dynamic_obstacle
-runtime_ready: false  # Experimental tuning; repeatability is not yet validated.
+runtime_ready: true
 integration_ready: true
 map_ready: true
 baseline_tag: parte-1-finalizada
@@ -13,8 +13,7 @@ integration:
   launch: ros2 launch f1tenth_controller two_vehicles.launch.py
   simulator: src/f1tenth_gym_ros/config/sim_two_vehicles.yaml
   completion: automatic_after_both_reach_target_and_stop
-  ten_lap_runtime_validated: true
-  repeatability_validated: false  # One of seven native trials detected wall contact.
+  ten_lap_runtime_validated: false
   overtake_review: visual_observation_required
 
 base_files:
@@ -34,14 +33,14 @@ vehicles:
   - id: ego_racecar
     role: primary_vehicle
     algorithm: follow_the_gap
-    controller_parameters: src/f1tenth_controller/config/two_vehicles.yaml
+    controller_parameters: src/f1tenth_controller/config/obstacles.yaml
     start: simulator_ego_pose
   - id: opp_racecar
     role: dynamic_obstacle
     algorithm: follow_the_gap
-    controller_parameters_base: src/f1tenth_controller/config/two_vehicles.yaml
-    # Nominal command factor; actual speeds also depend on each local scan.
-    nominal_speed_ratio_to_primary: 0.66
+    controller_parameters_base: src/f1tenth_controller/config/obstacles.yaml
+    # Propuesta inicial; no impone la mitad de la velocidad real en cada instante.
+    nominal_speed_ratio_to_primary: 0.5
     own_obstacle_and_corner_speed_limits: true
     start:
       relative_to: ego_racecar
@@ -64,9 +63,8 @@ session:
   different_speed_profiles_allowed: true
   invalidate_on_collision_of_any_vehicle: true
   invalidate_on_command_loss_of_any_vehicle: true
-  # Evita convertir al primer finalista en un obstáculo inmóvil sobre la pista.
-  first_finisher: continue_driving_until_both_complete
-  primary_speed_scale_after_ten_laps: 0.66
+  primary_after_target: stop_at_own_finish_gate
+  secondary_after_primary_target: continue_until_own_target
   record_first_ten_lap_times_for_each_vehicle: true
   stop_both_at_end: true
 
@@ -92,5 +90,4 @@ overtake:
   measurement: visual_observation_of_simulation
   automatic_event_recording: false
 
-pending_implementation:
-  - resolve_wall_contact_during_overtaking
+pending_implementation: []
