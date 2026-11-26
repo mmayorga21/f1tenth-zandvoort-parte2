@@ -150,3 +150,6 @@ To run another attempt, repeat the reset and enable commands from section 3.4. T
 ## Video 
 
 https://youtu.be/yoPjlcNOoIQ
+
+## Topics records
+https://drive.google.com/drive/folders/10RJijksX7bvzLSpzatnYBRaoEOTDSkhy?usp=drive_link
