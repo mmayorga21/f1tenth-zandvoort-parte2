@@ -147,6 +147,6 @@ ros2 service call /sim/end_attempt std_srvs/srv/Trigger "{}"
 
 To run another attempt, repeat the reset and enable commands from section 3.4. To close the programs, press `Ctrl+C` in their terminals.
 
-## Video de evidencia
+## Video 
 
-[Watch the ten-lap run with the requested camera changes on YouTube](https://youtu.be/yoPjlcNOoIQ).
+https://youtu.be/yoPjlcNOoIQ
